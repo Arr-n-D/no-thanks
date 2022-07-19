@@ -19,7 +19,7 @@ func Example() {
 	// running).
 	const (
 		// These paths will be different on your system.
-		seleniumPath = "browsers/selenium-server-4.3.0.jar"
+		seleniumPath = "browsers/selenium-server.jar"
 		chromeDriver = "browsers/chromedriver"
 		port         = 8080
 	)
