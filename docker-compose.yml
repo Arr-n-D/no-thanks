@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+
+  no-thanks:
+    container_name: no-thanks
+    restart: unless-stopped
+    tty: true
+    build: .
+    networks:
+      - untitledmmo
+
+networks:
+  untitledmmo:
+    driver: bridge

@@ -1,6 +1,3 @@
-// Binary init downloads the necessary files to perform an integration test
-// between this WebDriver client and multiple versions of Selenium and
-// browsers.
 package main
 
 import (
@@ -187,16 +184,16 @@ func main() {
 	ctx := context.Background()
 	if *downloadBrowsers {
 		chromeBuild := desiredChromeBuild
-		firefoxVersion := desiredFirefoxVersion
+		// firefoxVersion := desiredFirefoxVersion
 		if *downloadLatest {
 			chromeBuild = ""
-			firefoxVersion = ""
+			// firefoxVersion = ""
 		}
 
 		if err := addChrome(ctx, chromeBuild); err != nil {
 			glog.Errorf("Unable to download Google Chrome browser: %v", err)
 		}
-		addFirefox(firefoxVersion)
+		// addFirefox(firefoxVersion)
 	}
 
 	if err := addLatestGithubRelease(ctx, "SeleniumHQ", "htmlunit-driver", "htmlunit-driver-.*-jar-with-dependencies.jar", "htmlunit-driver.jar"); err != nil {
@@ -248,7 +245,7 @@ func handleFile(file file) error {
 		}
 	case ".bz2":
 		glog.Infof("Unzipping %q", file.name)
-		if err := exec.Command("tar", "-xjf", file.name).Run(); err != nil {
+		if err := exec.Command("tar", "-xj", file.name).Run(); err != nil {
 			return fmt.Errorf("Error unzipping %q: %v", file.name, err)
 		}
 	}
