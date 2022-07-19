@@ -7,7 +7,7 @@ COPY . .
 WORKDIR /usr/no-thanks/browsers
 RUN apt-get update && apt-get upgrade && apt-get install unzip
 # RUN export PATH
-RUN go run init.go --alsologtostderr
+# RUN go run init.go --alsologtostderr
 WORKDIR /usr/no-thanks/
 RUN go build -o ./no-thanks
 
