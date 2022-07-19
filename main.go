@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tebeka/selenium"
+	"github.com/tebeka/selenium/chrome"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func Example() {
 		port         = 8080
 	)
 	opts := []selenium.ServiceOption{
-		// selenium.StartFrameBuffer(),           // Start an X frame buffer for the browser to run in.
+		selenium.StartFrameBuffer(),         // Start an X frame buffer for the browser to run in.
 		selenium.ChromeDriver(chromeDriver), // Specify the path to GeckoDriver in order to use Firefox.
 		selenium.Output(os.Stderr),          // Output debug information to STDERR.
 	}
@@ -32,23 +33,30 @@ func Example() {
 	selenium.SetDebug(true)
 	service, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
 	if err != nil {
-		log.Println("panicked here")
 		panic(err) // panic is used only as an example and is not otherwise recommended.
 	}
 	defer service.Stop()
 
 	// Connect to the WebDriver instance running locally.
 	caps := selenium.Capabilities{"browserName": "chrome"}
+	chromeCaps := chrome.Capabilities{
+		Path: "",
+		Args: []string{
+			"--start-maximized",
+			"--window-size=1200x600",
+			"--no-sandbox",
+			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36",
+		},
+	}
+	caps.AddChrome(chromeCaps)
 	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", port))
 	if err != nil {
-		log.Println("panicked here")
 		panic(err)
 	}
 	defer wd.Quit()
 
 	// Navigate to the simple playground interface.
 	if err := wd.Get("http://play.golang.org/?simple=1"); err != nil {
-		log.Println("panicked here")
 		panic(err)
 	}
 

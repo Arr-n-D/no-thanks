@@ -180,30 +180,6 @@ func addFirefox(desiredVersion string) {
 }
 
 func main() {
-	flag.Parse()
-	ctx := context.Background()
-	if *downloadBrowsers {
-		chromeBuild := desiredChromeBuild
-		// firefoxVersion := desiredFirefoxVersion
-		if *downloadLatest {
-			chromeBuild = ""
-			// firefoxVersion = ""
-		}
-
-		if err := addChrome(ctx, chromeBuild); err != nil {
-			glog.Errorf("Unable to download Google Chrome browser: %v", err)
-		}
-		// addFirefox(firefoxVersion)
-	}
-
-	if err := addLatestGithubRelease(ctx, "SeleniumHQ", "htmlunit-driver", "htmlunit-driver-.*-jar-with-dependencies.jar", "htmlunit-driver.jar"); err != nil {
-		glog.Errorf("Unable to find the latest HTMLUnit Driver: %s", err)
-	}
-
-	if err := addLatestGithubRelease(ctx, "mozilla", "geckodriver", "geckodriver-.*linux64.tar.gz", "geckodriver.tar.gz"); err != nil {
-		glog.Errorf("Unable to find the latest Geckodriver: %s", err)
-	}
-
 	var wg sync.WaitGroup
 	for _, file := range files {
 		wg.Add(1)
