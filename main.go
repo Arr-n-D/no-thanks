@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/google/martian/log"
+	"github.com/google/martian/v3/log"
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
 )
@@ -36,9 +40,9 @@ func Initialize() selenium.WebDriver {
 	opts := []selenium.ServiceOption{
 		// selenium.StartFrameBuffer(),         // Start an X frame buffer for the browser to run in.
 		selenium.ChromeDriver(chromeDriver), // Specify the path to GeckoDriver in order to use Firefox.
-		selenium.Output(os.Stderr),          // Output debug information to STDERR.
+		// selenium.Output(os.Stderr),          // Output debug information to STDERR.
 	}
-	// selenium.SetDebug(true)
+	selenium.SetDebug(false)
 
 	if *linux {
 		opts = append(opts, selenium.ChromeDriver(linuxChromeDriver))
@@ -82,72 +86,22 @@ func Start() {
 	defer wd.Quit()
 
 	GoToLinkedIn(wd)
+	LoginToLinkedIn(wd)
 
-	// Navigate to the simple playground interface.
-	// if err := wd.Get("http://play.golang.org/?simple=1"); err != nil {
-	// 	panic(err)
-	// }
+	// infinite go routine
+	// go func([]selenium.WebElement, selenium.WebDriver) {
+	for {
+	LABEL:
+		messages := fetchMessages(wd)
+		messages = loopMessages(messages, wd)
 
-	// // Get a reference to the text box containing code.
-	// elem, err := wd.FindElement(selenium.ByCSSSelector, "#code")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// // Remove the boilerplate code already in the text box.
-	// if err := elem.Clear(); err != nil {
-	// 	panic(err)
-	// }
+		if len(messages) == 0 {
+			goto LABEL
+		}
+		log.Error
 
-	// // Enter some new code in text box.
-	// err = elem.SendKeys(`
-	// 	package main
-	// 	import "fmt"
-	// 	func main() {
-	// 		fmt.Println("Hello WebDriver!")
-	// 	}
-	// `)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// // Click the run button.
-	// btn, err := wd.FindElement(selenium.ByCSSSelector, "#run")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// if err := btn.Click(); err != nil {
-	// 	panic(err)
-	// }
-
-	// // Wait for the program to finish running and get the output.
-	// outputDiv, err := wd.FindElement(selenium.ByCSSSelector, "#output")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// var output string
-	// for {
-	// 	output, err = outputDiv.Text()
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	if output != "Waiting for remote server..." {
-	// 		break
-	// 	}
-	// 	time.Sleep(time.Millisecond * 100)
-	// }
-
-	// fmt.Printf("%s", strings.Replace(output, "\n\n", "\n", -1))
-	// // Example Output:
-	// // Hello WebDriver!
-	// //
-	// // Program exited.
-
-	// // The following shows an example of using the Actions API.
-	// // Please refer to the WC3 Actions spec for more detailed information.
-	// if err := wd.Get("http://play.golang.org/?simple=1"); err != nil {
-	// 	panic(err)
-	// }
+	}
+	// }(messages, wd)
 
 }
 
@@ -157,9 +111,8 @@ func GoToLinkedIn(wd selenium.WebDriver) {
 		panic(err)
 	}
 
-	LoginToLinkedIn(wd)
+	time.Sleep(time.Millisecond * 500)
 
-	time.Sleep(time.Second * 30)
 }
 
 func LoginToLinkedIn(wd selenium.WebDriver) {
@@ -211,13 +164,119 @@ func LoginToLinkedIn(wd selenium.WebDriver) {
 	}
 
 	time.Sleep(time.Second * 1)
-	//wait to find msg-overlay-list-bubble-search
-	elem, err = wd.FindElement(selenium.ByCSSSelector, ".msg-conversations-container__conversations-list.msg-overlay-list-bubble__conversations-list")
+
+}
+
+func loopMessages(messages []selenium.WebElement, wd selenium.WebDriver) []selenium.WebElement {
+	for _, message := range messages {
+		elem, err := message.FindElement(selenium.ByCSSSelector, ".msg-overlay-list-bubble__message-snippet--v2.m0.t-black.t-12.t-bold")
+		if err != nil {
+			// remove the message from the messages slice
+			// print the index and index + 1
+			messages = messages[1:]
+			continue
+		} else {
+			handleMessage(elem, wd)
+			messages = messages[1:]
+		}
+
+	}
+
+	return messages
+}
+
+func handleMessage(elem selenium.WebElement, wd selenium.WebDriver) {
+	elem.Click()
+
+	conversationBubble, err := wd.FindElement(selenium.ByCSSSelector, ".msg-overlay-conversation-bubble--is-active")
 	if err != nil {
 		panic(err)
 	}
 
-	// find the scrollable section with class msg-overlay-list-bubble__content--scrollable
+	elem, err = wd.FindElement(selenium.ByCSSSelector, ".msg-s-message-list__event.clearfix.msg-s-message-list__event--slide-in")
+	if err != nil {
+		panic(err)
+	}
+
+	messageData, err := elem.FindElement(selenium.ByCSSSelector, ".msg-s-event-listitem__body.t-14.t-black--light.t-normal")
+	if err != nil {
+		panic(err)
+	}
+
+	messageText, err := messageData.Text()
+	fmt.Println(messageText)
+	if err != nil {
+		panic(err)
+	}
+
+	time.Sleep(time.Second * 2)
+
+	replyToMessageIfMatchesKeyword(messageText, conversationBubble)
+
+}
+
+func replyToMessageIfMatchesKeyword(messageText string, conversationBubble selenium.WebElement) {
+	fmt.Println("Checking if message matches keyword")
+	file, err := os.Open("keywords/keywords.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	var keywords []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		keywords = append(keywords, scanner.Text())
+	}
+
+	for _, keyword := range keywords {
+		fmt.Println(keyword)
+		replyToMessage(messageText, keyword, conversationBubble)
+	}
+}
+
+func replyToMessage(messageText string, keyword string, conversationBubble selenium.WebElement) {
+	fmt.Println("Looking to reply to: " + messageText + " by matching keyword: " + keyword)
+	fmt.Println(messageText, keyword)
+	if strings.Contains(messageText, keyword) {
+		fmt.Println("Found keyword: " + keyword)
+
+		file, _ := ioutil.ReadFile("automated_replies/reply.txt")
+		reply := string(file)
+
+		editableInput, err := conversationBubble.FindElement(selenium.ByCSSSelector, ".msg-form__contenteditable.t-14.t-black--light.t-normal.flex-grow-1.full-height.notranslate")
+		if err != nil {
+			panic(err)
+		}
+
+		err = editableInput.SendKeys(reply)
+		if err != nil {
+			panic(err)
+		}
+
+		sendButton, err := conversationBubble.FindElement(selenium.ByCSSSelector, ".msg-form__send-button.artdeco-button.artdeco-button--1")
+		if err != nil {
+			panic(err)
+		}
+
+		time.Sleep(time.Millisecond * 300)
+		err = sendButton.Click()
+		if err != nil {
+			panic(err)
+		}
+
+	} else {
+		fmt.Println("No keyword found")
+	}
+}
+
+func fetchMessages(wd selenium.WebDriver) []selenium.WebElement {
+	fmt.Println("Fetching messages...")
+	elem, err := wd.FindElement(selenium.ByCSSSelector, ".msg-conversations-container__conversations-list.msg-overlay-list-bubble__conversations-list")
+	if err != nil {
+		panic(err)
+	}
+
 	section, err := wd.FindElement(selenium.ByCSSSelector, ".msg-overlay-list-bubble__content--scrollable")
 	if err != nil {
 		panic(err)
@@ -226,7 +285,7 @@ func LoginToLinkedIn(wd selenium.WebDriver) {
 	// loop 20 times and scroll down the page
 	// look, there's a better way to do this, like checking positions, BUT, this is a quick and dirty way to do it and that works for me
 	for i := 0; i < 20; i++ {
-		ScrollToBottomOfMessages(wd, section)
+		scrollToBottomOfMessages(wd, section)
 		time.Sleep(time.Millisecond * 500)
 	}
 
@@ -234,26 +293,11 @@ func LoginToLinkedIn(wd selenium.WebDriver) {
 	if err != nil {
 		panic(err)
 	}
-
-	// for each messages in the list, loop through and check if the message is a new message msg-overlay-list-bubble__message-snippet--v2 m0 t-black t-12 t-bold
-	for _, message := range messages {
-		elem, err := message.FindElement(selenium.ByCSSSelector, ".msg-overlay-list-bubble__message-snippet--v2.m0.t-black.t-12.t-bold")
-		if err != nil {
-			fmt.Println("Didn't find new message for this element")
-			continue
-		}
-
-		// if the message is a new message, click it
-		elem.Click()
-	}
-
+	return messages
 }
 
-func ScrollToBottomOfMessages(wd selenium.WebDriver, section selenium.WebElement) {
+func scrollToBottomOfMessages(wd selenium.WebDriver, section selenium.WebElement) {
 	args := []interface{}{section}
-	// section
-	// scroll down to bottom of section
-	// javascript executor to scroll to bottom of section
 	js := "arguments[0].scrollTop = arguments[0].scrollHeight"
 	_, err := wd.ExecuteScript(js, args)
 
